@@ -1,47 +1,61 @@
+
 import streamlit as st
 import google.generativeai as genai
+from gtts import gTTS
+import io
 
-st.set_page_config(page_title="Affiliate Helper", page_icon="🛍️", layout="centered")
+st.set_page_config(page_title="Affiliate Video Script & Voice", page_icon="🎬", layout="centered")
 
-st.title("🛍️ Affiliate Link & Caption Generator")
-st.caption("ระบบช่วยแปลงลิงก์และเขียนแคปชันสำหรับ TikTok / Shopee บนมือถือ")
+st.title("🎬 Tools สร้างคลิปปักตะกร้า (Script + เสียง AI)")
+st.caption("ระบบช่วยเขียนบทพากย์วิดีโอ 15-30 วินาที พร้อมแปลงเป็นไฟล์เสียงพากย์ AI ภาษาไทย")
 
-original_url = st.text_input("🔗 วางลิงก์สินค้า (Shopee/TikTok Shop):", placeholder="https://...")
-tone = st.selectbox(
-    "🎨 เลือกสไตล์แคปชัน:", 
-    ["สายป้ายยาปั่นๆ", "เน้นสเปก/รีวิวความรู้สึก", "สั้นกระชับเน้นโปรโมชัน", "เน้นจุดเด่นแก้ปัญหา"]
-)
-user_api_key = st.text_input("🔑 ใส่ Gemini API Key ของคุณ:", type="password")
+# ช่องใส่ข้อมูล
+prod_url = st.text_input("🔗 ลิงก์/ชื่อสินค้าที่ต้องการขาย:")
+prod_detail = st.text_area("รายละเอียด/จุดเด่นสินค้า (ย่อๆ):")
+api_key = st.text_input("🔑 ใส่ Gemini API Key ของคุณ:", type="password")
 
-if st.button("⚡ สร้างแคปชันและเตรียมลิงก์", use_container_width=True):
-    if not original_url:
-        st.warning("⚠️ กรุณากรอกลิงก์สินค้าด้วยครับ")
-    elif not user_api_key:
-        st.warning("⚠️ กรุณากรอก Gemini API Key ด้วยครับ")
+if st.button("✨ สร้างบทพากย์และไฟล์เสียง AI"):
+    if not api_key:
+        st.error("กรุณากรอก Gemini API Key ก่อนครับ")
+    elif not prod_url:
+        st.error("กรุณากรอกลิงก์หรือชื่อสินค้าครับ")
     else:
-        with st.spinner("⏳ กำลังสร้างแคปชัน..."):
-            try:
-                genai.configure(api_key=user_api_key)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                
-                prompt = f"""
-                ช่วยเขียนแคปชันขายของภาษาไทยสั้นๆ ปังๆ สำหรับอัปโพสต์ลง TikTok Video หรือ Shopee Video 
-                รายละเอียด:
-                - สไตล์ข้อความ: {tone}
-                - ลิงก์/ข้อมูลสินค้า: {original_url}
-                - ใส่ Emoji ให้น่าอ่าน มีแฮชแท็กยอดฮิต 3-5 อัน
-                - ใส่ข้อความเชิญชวนให้คนกดปักตะกร้า หรือจิ้มลิงก์
-                """
-                
+        try:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            
+            prompt = f"""
+            คุณเป็นนักสร้างคลิป TikTok Affiliate / Reeling มืออาชีพ 
+            ช่วยเขียน Script บทพากย์วิดีโอสั้น (15-30 วินาที) สำหรับขายสินค้า: {prod_url}
+            รายละเอียดสินค้า: {prod_detail}
+            
+            เงื่อนไขการตอบ:
+            1. เขียนเป็นคำพูดพากย์ภาษาไทยที่อ่านแล้วเป็นธรรมชาติ น่าสนใจ ดึงดูดสายป้ายยา 
+            2. ต้องมีคำพูดเชิญชวนให้กดที่ตะกร้าเหลือง/ตะกร้าสินค้าช่วงท้าย
+            3. ให้ส่งกลับเฉพาะ "เนื้อหาคำพูดพากย์เพียวๆ" ไม่ต้องมีหัวข้อ ฉาก หรือวงเล็บอธิบาย ให้เป็นข้อความที่นำไปแปลงเป็นเสียงพากย์ได้ทันที
+            """
+            
+            with st.spinner("AI กำลังคิดบทพากย์และสร้างไฟล์เสียง..."):
                 response = model.generate_content(prompt)
-                generated_caption = response.text
+                script_text = response.text.strip()
                 
-                st.success("✅ สร้างเรียบร้อย!")
-                st.subheader("📝 แคปชันที่ได้ (กดก๊อปปี้ได้เลย):")
-                st.code(generated_caption, language=None)
+                st.success("สร้างบทพากย์สำเร็จ!")
+                st.subheader("📜 บทพากย์สำหรับคลิป:")
+                st.write(script_text)
                 
-                st.subheader("🔗 ลิงก์สินค้า:")
-                st.code(original_url, language=None)
+                # แปลงบทพากย์เป็นเสียง AI ด้วย gTTS
+                tts = gTTS(text=script_text, lang='th')
+                fp = io.BytesIO()
+                tts.write_to_fp(fp)
+                fp.seek(0)
                 
-            except Exception as e:
-                st.error(f"เกิดข้อผิดพลาด: {e}")
+                st.subheader("🔊 ไฟล์เสียงพากย์ AI:")
+                st.audio(fp, format='audio/mp3')
+                st.download_button(
+                    label="⬇️ ดาวน์โหลดไฟล์เสียง (MP3)",
+                    data=fp,
+                    file_name="voiceover.mp3",
+                    mime="audio/mp3"
+                )
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาด: {e}")
